@@ -8,25 +8,25 @@ from meter.config import ex
 from meter.modules import METERTransformerSS
 
 import data
-from data import F30kDataModule, MscocoDataModule
+from data import F30kDataModule, MscocoDataModule, WikiartDataModule
 import torch
 
-
-os.environ['CUDA_VISIBLE_DEVICES'] = '5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 @ex.automain
 def main(_config):
-    print(_config)
-    
     _config = copy.deepcopy(_config)
     pl.seed_everything(_config["seed"], workers=True)
 
     if 'f30k' in _config['exp_name']:
         dm = F30kDataModule(_config)
-    else:
+    elif 'ooco' in _config['exp_name']:
         dm = MscocoDataModule(_config)
+    elif 'wikiart' in _config['exp_name']:
+        dm = WikiartDataModule(_config)
+    else:
+        raise Exception("Unknown Dataset")
     vocab = None
-
     model = METERTransformerSS(_config)
 
     if _config['test_only']:
@@ -50,7 +50,7 @@ def main(_config):
     )
 
     callbacks = [checkpoint_callback]
-
+    
     num_gpus = (
         _config["num_gpus"]
         if isinstance(_config["num_gpus"], int)

@@ -150,9 +150,127 @@ def get_paths(path, name='coco', use_restval=False):
         roots['val'] = {'img': imgdir, 'cap': cap}
         roots['test'] = {'img': imgdir, 'cap': cap}
         ids = {'train': None, 'val': None, 'test': None}
+    elif 'wikiart' == name:
+        imgdir = os.path.join(path, 'images')
+        capdir = os.path.join(path, 'annotations')
+        roots['train'] = {
+            'img': os.path.join(imgdir, 'train'),
+            'cap': os.path.join(capdir, 'train.json')
+        }
+        roots['val'] = {
+            'img': os.path.join(imgdir, 'testval'),
+            'cap': os.path.join(capdir, 'testval.json')
+        }
+        roots['test'] = {
+            'img': os.path.join(imgdir, 'testval'),
+            'cap': os.path.join(capdir, 'testval.json')
+        }
+        roots['trainrestval'] = {
+            'img': (roots['train']['img'], roots['val']['img']),
+            'cap': (roots['train']['cap'], roots['val']['cap'])
+        }
+        ids['train'] = np.load(os.path.join(capdir, 'train_ids.npy'))
+        length = len(np.load(os.path.join(capdir, 'testval_ids.npy')))
+        ids['val'] = np.load(os.path.join(capdir, 'testval_ids.npy'))[:length//2]
+        ids['test'] = np.load(os.path.join(capdir, 'testval_ids.npy'))[length//2:]
+        #ids['test'] = np.load(os.path.join(capdir, 'coco_test_ids.npy'))[20000:25000]
+        # ids['trainrestval'] = (
+        #     ids['train'],
+        #     np.load(os.path.join(capdir, 'coco_restval_ids.npy')))
+        # if use_restval:
+        #     roots['train'] = roots['trainrestval']
+        #     ids['train'] = ids['trainrestval']
 
     return roots, ids
 
+class WikiartDataset(data.Dataset):
+    """Wikiart Custom Dataset compatible with torch.utils.data.DataLoader."""
+
+    def __init__(self, root, json, vocab, max_len, tokenizer, transform=None, ids=None):
+        """
+        Args:
+            root: image directory.
+            json: wikiart annotation file path.
+            vocab: vocabulary wrapper.
+            transform: transformer for image.
+        """
+        #
+        self.max_len = max_len
+        self.tokenizer = get_pretrained_tokenizer(tokenizer)
+        #
+
+        self.root = root
+        # when using `restval`, two json files are needed
+        if isinstance(json, tuple):
+            self.coco = (COCO(json[0]), COCO(json[1]))
+        else:
+            self.coco = (COCO(json),)
+            self.root = (root,)
+        
+        # if ids provided by get_paths, use split-specific ids
+        if ids is None:
+            self.ids = (self.coco[0].anns.keys(),self.coco[1].anns.keys()) if isinstance(json, tuple)\
+                        else self.coco[0].anns.keys()
+        else:
+            self.ids = ids
+        # if `restval` data is to be used, record the break point for ids
+        if isinstance(self.ids, tuple):
+            self.bp = len(self.ids[0])
+            self.ids = list(self.ids[0]) + list(self.ids[1])
+        else:
+            self.bp = len(self.ids)
+        self.vocab = vocab
+        self.transform = transform
+
+    def __getitem__(self, index):
+        """This function returns a tuple that is further passed to collate_fn
+        """
+        vocab = self.vocab
+        root, caption, img_id, path, image = self.get_raw_item(index)
+
+        if self.transform is not None:
+            image = self.transform(image)
+        
+
+        # Convert caption (string) to word ids.
+        is_bert = True
+        if is_bert:
+            tokens, input_ids, input_mask, input_type_ids = convert_to_feature(caption, self.max_len, self.tokenizer)
+            input_ids = torch.tensor(input_ids, dtype=torch.long)
+            input_mask = torch.tensor(input_mask, dtype=torch.long)
+            input_type_ids = torch.tensor(input_type_ids, dtype=torch.long)
+            return image, input_ids, index, img_id, input_mask, input_type_ids
+        else:
+            tokens = nltk.tokenize.word_tokenize(
+            str(caption).lower())
+            caption = []
+            caption.append(vocab('<start>'))
+            caption.extend([vocab(token) for token in tokens])
+            caption.append(vocab('<end>'))
+            target = torch.Tensor(caption)
+            return image, target, index, img_id
+
+    def get_raw_item(self, index):
+        if index < self.bp:
+            coco = self.coco[0]
+            root = self.root[0]
+        else:
+            coco = self.coco[1]
+            root = self.root[1]
+        ann_id = self.ids[index]
+        try:
+            caption = coco.anns[ann_id]['caption']
+        except:
+            print(coco.anns.keys())
+            raise Exception("NO KEY")
+        img_id = coco.anns[ann_id]['image_id']
+        path = coco.loadImgs(img_id)[0]['file_name']
+        image = Image.open(os.path.join(root, path)).convert('RGB')
+
+        return root, caption, img_id, path, image
+
+    def __len__(self):
+        return len(self.ids)
 
 class CocoDataset(data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
@@ -546,4 +664,104 @@ class MscocoDataModule(LightningDataModule):
                                               collate_fn=collate_fn_bert)
         return loader
 
+
+class WikiartDataModule(LightningDataModule):
+    def __init__(self, _config, dist=False):
+        super().__init__()
+
+        #_config['data_root'], _config['datasets'], vocab, _config['max_text_len'], _config['tokenizer'], _config['image_size'], _config['per_gpu_batchsize'], _config['num_workers'])
+
+        self.data_path = os.path.join(_config["data_root"], _config['datasets'])
+        self.datasets = _config['datasets']
+        self.vocab = None
+
+        self.num_workers = _config["num_workers"]
+        self.batch_size = _config["per_gpu_batchsize"]
+        self.eval_batch_size = self.batch_size
+
+        self.image_size = _config["image_size"]
+        self.max_text_len = _config["max_text_len"]
+
+        self.tokenizer = _config["tokenizer"]
+
+        self.setup_flag = False
+        self.dist = dist
+
+        self.roots, self.ids = get_paths(self.data_path, self.datasets)
+
+    def set_train_dataset(self):
+        transform = get_transform(self.datasets, 'train', self.image_size)
+    
+        self.train_dataset = WikiartDataset(root=self.roots['train']['img'],
+                                json=self.roots['train']['cap'],
+                                vocab=self.vocab,
+                                max_len=self.max_text_len,
+                                tokenizer=self.tokenizer,
+                                transform=transform, ids=self.ids['train'])
+
+    def set_val_dataset(self):
+        transform = get_transform(self.datasets, 'val', self.image_size)
+
+        self.val_dataset = WikiartDataset(root=self.roots['val']['img'],
+                                json=self.roots['val']['cap'],
+                                vocab=self.vocab,
+                                max_len=self.max_text_len,
+                                tokenizer=self.tokenizer,
+                                transform=transform, ids=self.ids['val'])
+
+    def set_test_dataset(self):
+        transform = get_transform(self.datasets, 'test', self.image_size)
+
+        self.test_dataset = WikiartDataset(root=self.roots['test']['img'],
+                                json=self.roots['test']['cap'],
+                                vocab=self.vocab,
+                                max_len=self.max_text_len,
+                                tokenizer=self.tokenizer,
+                                transform=transform, ids=self.ids['test'])
+
+    def setup(self, stage):
+        if not self.setup_flag:
+            self.set_train_dataset()
+            self.set_val_dataset()
+            self.set_test_dataset()
+
+            self.setup_flag = True
+
+        '''if self.dist:
+            self.train_sampler = DistributedSampler(self.train_dataset, shuffle=True)
+            self.val_sampler = DistributedSampler(self.val_dataset, shuffle=False)
+        else:
+            self.train_sampler = None
+            self.val_sampler = None'''
+
+    def train_dataloader(self):
+        loader = torch.utils.data.DataLoader(dataset=self.train_dataset,
+                                              batch_size=self.batch_size,
+                                              #sampler=self.train_sampler,
+                                              shuffle=True,
+                                              pin_memory=True,
+                                              num_workers=self.num_workers,
+                                              collate_fn=collate_fn_bert)
+        return loader
+
+    def val_dataloader(self):
+        loader = torch.utils.data.DataLoader(dataset=self.val_dataset,
+                                              batch_size=self.batch_size,
+                                              #sampler=self.val_sampler,
+                                              shuffle=False,
+                                              pin_memory=True,
+                                              num_workers=self.num_workers,
+                                              collate_fn=collate_fn_bert)
+        return loader
+
+
+    def test_dataloader(self):
+        loader = torch.utils.data.DataLoader(dataset=self.test_dataset,
+                                              batch_size=self.batch_size,
+                                              #sampler=self.val_sampler,
+                                              shuffle=False,
+                                              pin_memory=True,
+                                              num_workers=self.num_workers,
+                                              collate_fn=collate_fn_bert)
+        return loader
 
