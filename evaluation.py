@@ -43,12 +43,13 @@ def i2t_SCAN(sims, npts=None, return_ranks=False):
     else:
         return (r1, r5, r10, r20, r50, r70, r100, medr, meanr)
 
+import numpy as np
+
 def t2i_SCAN(sims, npts=None, return_ranks=False):
     """
     Text->Images (Image Search)
     Images: (N, n_region, d) matrix of images
     Captions: (5N, max_n_word, d) matrix of captions
-    CapLens: (5N) array of caption lengths
     sims: (N, 5N) matrix of similarity im-cap
     """
     npts = sims.shape[0]
@@ -60,9 +61,11 @@ def t2i_SCAN(sims, npts=None, return_ranks=False):
 
     for index in range(npts):
         for i in range(5):
-            inds = np.argsort(sims[5 * index + i])[::-1]
-            ranks[5 * index + i] = np.where(inds == index)[0][0]
-            top1[5 * index + i] = inds[0]
+            # Ensure index doesn't go out of bounds
+            if 5 * index + i < sims.shape[0]:
+                inds = np.argsort(sims[5 * index + i])[::-1]
+                ranks[5 * index + i] = np.where(inds == index)[0][0]
+                top1[5 * index + i] = inds[0]
 
     # Compute metrics
     r1 = 100.0 * len(np.where(ranks < 1)[0]) / len(ranks)
