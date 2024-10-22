@@ -338,41 +338,29 @@ def func_attention(query, context, smooth, eps=1e-8):
     batch_size_q, queryL = query.size(0), query.size(1)
     batch_size, sourceL = context.size(0), context.size(1)
 
-
     # Get attention
-    # --> (batch, d, queryL)
-    queryT = torch.transpose(query, 1, 2)
+    queryT = query.transpose(1, 2)  # Transpose in-place
 
-    # (batch, sourceL, d)(batch, d, queryL)
-    # --> (batch, sourceL, queryL)
-    attn = torch.bmm(context, queryT)
-    
+    # Compute dot product attention
+    attn = torch.bmm(context, queryT)  # Shape: (batch, sourceL, queryL)
     attn = nn.LeakyReLU(0.1)(attn)
-    attn = l2norm(attn, 2)
-    # --> (batch, queryL, sourceL)
-    attn = torch.transpose(attn, 1, 2).contiguous()
-    # --> (batch*queryL, sourceL)
-    attn = attn.view(batch_size*queryL, sourceL)
-    attn = nn.Softmax(1)(attn*smooth)
-    # --> (batch, queryL, sourceL)
+
+    # Normalize attention across each query
+    attn = attn / (attn.norm(2, dim=2, keepdim=True) + eps)
+    attn = attn.transpose(1, 2).contiguous()  # (batch, queryL, sourceL)
+    attn = attn.view(batch_size * queryL, sourceL)
+
+    # Apply softmax with smoothing
+    attn = nn.Softmax(dim=1)(attn * smooth)
+
+    # Reshape back to original size
     attn = attn.view(batch_size, queryL, sourceL)
-    # --> (batch, sourceL, queryL)
-    attnT = torch.transpose(attn, 1, 2).contiguous()
-    #print(attnT.shape)
+    attnT = attn.transpose(1, 2).contiguous()  # (batch, sourceL, queryL)
 
-    #pic = attnT[0][0].view(28, 28)
-    #print(pic)
-    #plt.matshow(pic.data.cpu().numpy(), cmap=plt.cm.Blues)
-    #plt.savefig('3.jpg')
-    #assert 1==0
-
-    # --> (batch, d, sourceL)
-    contextT = torch.transpose(context, 1, 2)
-    # (batch x d x sourceL)(batch x sourceL x queryL)
-    # --> (batch, d, queryL)
-    weightedContext = torch.bmm(contextT, attnT)
-    # --> (batch, queryL, d)
-    weightedContext = torch.transpose(weightedContext, 1, 2)
+    # Compute weighted context using attention weights
+    contextT = context.transpose(1, 2)  # (batch, d, sourceL)
+    weightedContext = torch.bmm(contextT, attnT)  # (batch, d, queryL)
+    weightedContext = weightedContext.transpose(1, 2)  # (batch, queryL, d)
 
     return weightedContext, attnT
 
