@@ -26,7 +26,7 @@ def config():
     seed = 0
     datasets = "wikiart"
     loss_names = _loss_names({"irtr": 1})
-    batch_size = 58  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
+    batch_size = 12  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
     margin = 0.2
 
     # Image setting
@@ -83,7 +83,7 @@ def config():
     # below params varies with the environment
     data_root = 'original-datasets/'
     log_dir = "result"
-    per_gpu_batchsize = 58  # you should define this manually with per_gpu_batch_size=#
+    per_gpu_batchsize = 12  # you should define this manually with per_gpu_batch_size=#
     num_gpus = 1
     num_nodes = 1
     load_path = ""
