@@ -18,9 +18,11 @@ def i2t_SCAN(sims, npts=None, return_ranks=False):
         # Score
         rank = 1e20
         for i in range(5 * index, 5 * index + 5, 1):
-            tmp = np.where(inds == i)[0][0]
-            if tmp < rank:
-                rank = tmp
+            match = np.where(inds == i)[0]
+            if len(match) > 0:  # Fix for out-of-bounds error
+                tmp = match[0]
+                if tmp < rank:
+                    rank = tmp
         ranks[index] = rank
         top1[index] = inds[0]
 
