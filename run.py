@@ -10,6 +10,7 @@ from meter.modules import METERTransformerSS
 import data
 from data import F30kDataModule, MscocoDataModule, WikiartDataModule
 import torch
+import json 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -78,6 +79,8 @@ def main(_config):
     elif _config["task"] == 'train':
         trainer.fit(model, datamodule=dm)
     elif _config["task"] == 'predict':
-        trainer.predict(model, datamodule=dm)
+        result = trainer.predict(model, datamodule=dm)
+        with open('output.json', 'w') as json_file:
+            json.dump(data, json_file, indent=4)
     else:
         raise Exception("Unknown task for trainer")
