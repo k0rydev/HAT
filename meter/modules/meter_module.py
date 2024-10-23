@@ -18,7 +18,7 @@ class METERTransformerSS(pl.LightningModule):
         self.save_hyperparameters()
 
         self.eval_bool = False
-        self.current_tasks == 'irtr'
+        self.current_tasks == ['irtr']
 
         resolution_after=config['image_size']
 
