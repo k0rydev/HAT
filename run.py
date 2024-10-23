@@ -81,6 +81,6 @@ def main(_config):
     elif _config["task"] == 'predict':
         result = trainer.predict(model, datamodule=dm)
         with open('output.json', 'w') as json_file:
-            json.dump(data, json_file, indent=4)
+            json.dump(result, json_file, indent=4)
     else:
         raise Exception("Unknown task for trainer")
