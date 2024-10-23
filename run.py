@@ -29,7 +29,7 @@ def main(_config):
     vocab = None
     model = METERTransformerSS(_config)
 
-    if _config['test_only']:
+    if _config['task']=='test' or _config['task']=='predict':
         ckpt = torch.load(_config['checkpoint'])
         model.load_state_dict(ckpt['state_dict'])
 
