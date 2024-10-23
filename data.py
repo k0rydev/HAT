@@ -718,12 +718,23 @@ class WikiartDataModule(LightningDataModule):
                                 max_len=self.max_text_len,
                                 tokenizer=self.tokenizer,
                                 transform=transform, ids=self.ids['test'])
+        
+    def set_predict_dataset(self):
+        transform = get_transform(self.datasets, 'test', self.image_size)
+
+        self.predict_dataset = WikiartDataset(root=self.roots['test']['img'],
+                                json=self.roots['test']['cap'],
+                                vocab=self.vocab,
+                                max_len=self.max_text_len,
+                                tokenizer=self.tokenizer,
+                                transform=transform, ids=self.ids['test'])
 
     def setup(self, stage):
         if not self.setup_flag:
             self.set_train_dataset()
             self.set_val_dataset()
             self.set_test_dataset()
+            self.set_predict_dataset()
 
             self.setup_flag = True
 
@@ -757,6 +768,16 @@ class WikiartDataModule(LightningDataModule):
 
     def test_dataloader(self):
         loader = torch.utils.data.DataLoader(dataset=self.test_dataset,
+                                              batch_size=self.batch_size,
+                                              #sampler=self.val_sampler,
+                                              shuffle=False,
+                                              pin_memory=True,
+                                              num_workers=self.num_workers,
+                                              collate_fn=collate_fn_bert)
+        return loader
+    
+    def predict_dataloader(self):
+        loader = torch.utils.data.DataLoader(dataset=self.predict_dataset,
                                               batch_size=self.batch_size,
                                               #sampler=self.val_sampler,
                                               shuffle=False,
