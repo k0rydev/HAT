@@ -17,6 +17,7 @@ from evaluation import i2t_SCAN, t2i_SCAN
 import sys
 
 import json
+from transformers import BertTokenizer
 
 def compute_mlm(pl_module, batch):
     infer = pl_module.infer(batch, mask_text=True, mask_image=False)
@@ -777,7 +778,7 @@ def compute_irtr_val(pl_module):
 @torch.no_grad()
 def compute_irtr_test(pl_module):
     val_dataloader = pl_module.trainer.datamodule.test_dataloader()
-
+    tokenizer = BertTokenizer.from_pretrained(pl_module.hparams.config['tokenizer'])
     results = []
     
     img_embs = None
@@ -851,7 +852,6 @@ def compute_irtr_test(pl_module):
         stc_lens[ids] = np.asarray(lengths, dtype=np.int)
         
         # If text is tokenized, detokenize (example using Hugging Face tokenizer)
-        tokenizer = pl_module.tokenizer  # Assuming your module has a tokenizer
         decoded_texts = tokenizer.batch_decode(input_ids, skip_special_tokens=True)
 
         # Collect image_id and corresponding text
