@@ -766,7 +766,7 @@ def compute_irtr_val(pl_module):
     (r1, r5, r10, r20, r50, r70, r100, medr, meanr) = i2t_SCAN(sims_all)
     (r1i, r5i, r10i, r20i, r50i, r70i, r100i, medri, meanri) = t2i_SCAN(sims_all)
 
-    np.save('/kaggle/working/results/i2t.npy', sims_all)
+    #np.save('/data2/lihaoxuan/New-Swin-Ablation/test/flickr/runs/sims/i2t.npy', sims_all)
     
     pl_module.log('best_irtr', (r1+r1i))
         
