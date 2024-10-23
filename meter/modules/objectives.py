@@ -778,7 +778,6 @@ def compute_irtr_val(pl_module):
 @torch.no_grad()
 def compute_irtr_test(pl_module):
     val_dataloader = pl_module.trainer.datamodule.test_dataloader()
-    tokenizer = BertTokenizer.from_pretrained(pl_module.hparams.config['tokenizer'])
     results = []
     
     img_embs = None
@@ -850,16 +849,6 @@ def compute_irtr_test(pl_module):
         #
 
         stc_lens[ids] = np.asarray(lengths, dtype=np.int)
-        
-        # If text is tokenized, detokenize (example using Hugging Face tokenizer)
-        decoded_texts = tokenizer.batch_decode(input_ids, skip_special_tokens=True)
-
-        # Collect image_id and corresponding text
-        for image_id, decoded_text in zip(ids, decoded_texts):
-            results.append({
-                "image_id": image_id.item(),  # Convert tensor to int
-                "caption": decoded_text
-            })
 
     img_embs = np.array([img_embs[i] for i in range(0, len(img_embs), 5)])
     
@@ -910,12 +899,6 @@ def compute_irtr_test(pl_module):
     (r1i, r5i, r10i, r20i, r50i, r70i, r100i, medri, meanri) = t2i_SCAN(sims_all)
 
     # np.save('/kaggle/working/i2t.npy', sims_all)
-    
-    # Save results as JSON
-    with open('/kaggle/working/image_captions.json', 'w') as json_file:
-        json.dump(results, json_file, indent=4)
-
-    print(f"Results saved to 'image_captions.json'")
     
     pl_module.log('best_irtr', (r1+r1i))
         

@@ -73,7 +73,11 @@ def main(_config):
         val_check_interval=_config["val_check_interval"],
     )
 
-    if not _config["test_only"]:
-        trainer.fit(model, datamodule=dm)
-    else:
+    if _config["task"] == 'test':
         trainer.test(model, datamodule=dm)
+    elif _config["task"] == 'train':
+        trainer.fit(model, datamodule=dm)
+    elif _config["task"] == 'predict':
+        trainer.predict(model, datamodule=dm)
+    else:
+        raise Exception("Unknown task for trainer")
