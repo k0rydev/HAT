@@ -852,13 +852,15 @@ def compute_irtr_test(pl_module):
         stc_lens[ids] = np.asarray(lengths, dtype=np.int)
         
         # If text is tokenized, detokenize (example using Hugging Face tokenizer)
-        decoded_texts = tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+        input_texts = tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+        infer_texts = tokenizer.batch_decode(infer['text_ids'], skip_special_tokens=True)
 
         # Collect image_id and corresponding text
-        for image_id, decoded_text in zip(ids, decoded_texts):
+        for image_id, decoded_text in zip(ids, input_texts):
             results.append({
                 "image_id": image_id.item(),  # Convert tensor to int
-                "caption": decoded_text
+                "input_ids": decoded_text,
+                "infer_ids": infer_texts
             })
 
     img_embs = np.array([img_embs[i] for i in range(0, len(img_embs), 5)])
