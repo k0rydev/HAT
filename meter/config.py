@@ -77,7 +77,7 @@ def config():
     resume_from = None
     fast_dev_run = False
     val_check_interval = 1.0
-    task = "predict"
+    test_only = False
     checkpoint = 'ckpt/wikiart/last.ckpt'
 
     # below params varies with the environment
@@ -152,7 +152,7 @@ def flickr_config():
     resume_from = None
     fast_dev_run = False
     val_check_interval = 1.0
-    task = "test"
+    test_only = False
     checkpoint = '/data3/lihaoxuan/New_Time/TKDE/github/runs/i2t_freeze/epoch=68-step=172499-v1.ckpt'
 
     # below params varies with the environment
@@ -227,7 +227,7 @@ def coco_config():
     resume_from = None
     fast_dev_run = False
     val_check_interval = 1.0
-    task = "test"
+    test_only = False
     checkpoint = '/data3/lihaoxuan/New_Time/TKDE/github/runs/i2t_freeze/last.ckpt'
 
     # below params varies with the environment
